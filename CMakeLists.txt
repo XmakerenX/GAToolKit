@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(gatoolkit)
+project(GAToolKit)
 
-add_executable(gatoolkit main.cpp)
-
-install(TARGETS gatoolkit RUNTIME DESTINATION bin)
+add_executable(GeneticsAlgorithem GeneticsAlgorithem.cpp)
+add_executable(KnapsackGA KnapsackGA.cpp)
