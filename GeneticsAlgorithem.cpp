@@ -97,10 +97,12 @@ void createNewGeneration(std::vector<int>& population)
 
 	//fill the "killed" individuals with offsprings of fittest parents
 	// create 2 children from each pair
-	population.push_back(mateParents(population[0], population[1]));
-	population.push_back(mateParents(population[0], population[1]));
-	population.push_back(mateParents(population[2], population[3]));
-	population.push_back(mateParents(population[2], population[3]));
+        int popSize = population.size();
+        for (int i = 0; i < popSize; i += 2)
+        {
+            population.push_back(mateParents(population[i], population[i+1]));
+            population.push_back(mateParents(population[i], population[i+1]));
+        }
 }
 //-------------------------------------------------------------------------
 int mateParents(int parent1, int parent2)
