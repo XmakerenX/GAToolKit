@@ -44,7 +44,8 @@ std::vector<Pop>            generateFirstGeneration (int numberOfItems, const st
 void                        pickOnlyTheFittests     (std::vector<Pop>& population, const std::vector<Item>& items, int totalWeight);
 void                        createNewGeneration     (std::vector<Pop>& population);
 
-Pop                         mateParents             (DynamicBitSet parent1, DynamicBitSet parent2);
+void                        mateParents             (DynamicBitSet parent1, DynamicBitSet parent2, std::vector< Pop >& population);
+void                        mutateChild             (DynamicBitSet& child);
 int                         calcFitness             (DynamicBitSet a, const std::vector<Item>& items, int totalWeight);
 bool                        cmp                     (DynamicBitSet a, DynamicBitSet b);
 bool                        compareInterval         (const Pop& a, const Pop& b);
@@ -54,7 +55,7 @@ bool                        compareInterval         (const Pop& a, const Pop& b)
 //obviously, the solution is 4096 and the problem is easy, but its interesting to see how
 //A genetic algorithem will behave, and that is why I am writing this code
 
-const int populationNumber = 100;
+const int populationNumber = 1000;
 // const int numberOfBits = 12;
 // const int searchSpace = pow(2,numberOfBits);
 
@@ -77,21 +78,35 @@ int main()
     
     std::cout << "the items are \n";
     for (const Item& item : items)
-    {
         std::cout << item.val << " " << item.weight << "\n";
-    }
     
     //Create first generation
     std::vector<Pop> population = generateFirstGeneration(items.size(), items, W);
     
+    int lastFittest = -300000;
+    int con = 0;
     //Apply GA for 50 generations
-    for (int gen = 0; gen < 1000; gen++)
+    for (int gen = 0; gen < 50; gen++)
     {
         pickOnlyTheFittests(population, items, W);
         std::cout << "Gen " << gen << "'s fittest is:" << population[0].fitness << std::endl;
         std::cout << "Gen " << gen << "'s fittest chromosome is:" << population[0].chromosome << std::endl;
+        
+//         if (lastFittest == population[0].fitness)
+//         {
+//             con++;
+//             if (con == 10)
+//                 break;
+//         }
+//         else
+//         {
+//             con = 0;
+//             lastFittest = population[0].fitness;
+//         }
+        
         createNewGeneration(population);
-        for (int i = 0; i < populationNumber; i++) std::cout << population[i].fitness << std::endl;
+        for (int i = 0; i < populationNumber; i++) 
+            std::cout << population[i].fitness << std::endl;
     }
     
     for (Pop& p : population)
@@ -105,6 +120,25 @@ int main()
     
     std::cout << "Number of items " << items.size() << "\n";
     std::cout << "Knapsack Weight " << W << "\n";
+    int weight  = 0;
+    int i = population[0].chromosome.find_first();
+    
+    if (i == DynamicBitSet::npos)
+    {
+        return -20000;
+    }
+    
+    weight += items[i].weight;
+    
+    while ( (i = population[0].chromosome.find_next(i)) != DynamicBitSet::npos)
+    {
+        weight += items[i].weight;
+    }
+    std::cout << "weight :" << weight << "\n";
+    
+    std::cout << "the items are \n";
+    for (const Item& item : items)
+        std::cout << item.val << " " << item.weight << "\n";
     
     return 0;
 }
@@ -218,15 +252,16 @@ void createNewGeneration(std::vector< Pop >& population)
         int popSize = population.size();
         for (int i = 0; i < popSize; i += 2)
         {
-            population.push_back(mateParents(population[i].chromosome, population[i+1].chromosome));
-            population.push_back(mateParents(population[i].chromosome, population[i+1].chromosome));
+            mateParents(population[i].chromosome, population[i+1].chromosome, population);
         }
 }
 //-------------------------------------------------------------------------
-Pop mateParents(DynamicBitSet parent1, DynamicBitSet parent2)
+void mateParents(DynamicBitSet parent1, DynamicBitSet parent2, std::vector< Pop >& population)
 {
     int joinBitLocation = (rand() % parent1.size());
     joinBitLocation = parent1.size() - joinBitLocation;
+    
+    joinBitLocation = parent1.size() / 2;
     
     // mask starts as numberOfBits ones
     unsigned long temp = pow(2, parent1.size() + 1) - 1;
@@ -237,15 +272,28 @@ Pop mateParents(DynamicBitSet parent1, DynamicBitSet parent2)
     DynamicBitSet chromozomeX = parent1 & (mask.flip()); // upper  part
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
     DynamicBitSet child = chromozomeX | chromozomeY;
+    mutateChild(child);
+    population.push_back(Pop(child, 0));
+    
+    chromozomeX = parent2 & (mask.flip()); // upper  part
+    chromozomeY = parent1 & mask;          // bottom part
+    child = chromozomeX | chromozomeY;
+    mutateChild(child);
+    population.push_back(Pop(child, 0));
+}
 
-    if (rand() % 6 == 0)
+void mutateChild(DynamicBitSet& child)
+{
+    std::uniform_int_distribution<int> mutateDistributaion(0, 6);
+    
+    if (mutateDistributaion(generator) == 0)
     {
+        std::cout << child.size() << "\n";
+        std::uniform_int_distribution<int> bitDistributaion(0, child.size() - 1);
         // what bit to flip? when 0 is the LSB and 11 the MSB
-        int randMutation = rand() % parent1.size();
+        int randMutation = bitDistributaion(generator);
         child.flip(randMutation);
     }
-    
-    return Pop(child, 0);
 }
 
 int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight)
