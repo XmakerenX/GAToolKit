@@ -2,6 +2,7 @@
 //
 #include <iostream>
 #include <algorithm>
+#include <chrono>
 #include <random>
 #include <limits>
 #include <functional>
@@ -39,7 +40,7 @@ struct Pop
 
 int                         knapSackDynamic         (int W, const std::vector<Item> items);
 std::vector<Item>           generateKnapsackItems   (int numberOfItems = 0);
-std::vector<Pop>            generateFirstGeneration (int numberOfItems);
+std::vector<Pop>            generateFirstGeneration (int numberOfItems, const std::vector<Item>& items, int totalWeight);
 void                        pickOnlyTheFittests     (std::vector<Pop>& population, const std::vector<Item>& items, int totalWeight);
 void                        createNewGeneration     (std::vector<Pop>& population);
 
@@ -53,14 +54,19 @@ bool                        compareInterval         (const Pop& a, const Pop& b)
 //obviously, the solution is 4096 and the problem is easy, but its interesting to see how
 //A genetic algorithem will behave, and that is why I am writing this code
 
-const int populationNumber = 16;
-const int numberOfBits = 12;
-const int searchSpace = pow(2,numberOfBits);
+const int populationNumber = 100;
+// const int numberOfBits = 12;
+// const int searchSpace = pow(2,numberOfBits);
 
 std::default_random_engine generator;
 
 int main()
-{
+{    
+    typedef std::chrono::high_resolution_clock myclock;
+    myclock::time_point beginning = myclock::now();
+//     
+    generator.seed(beginning.time_since_epoch().count());
+    
     std::uniform_int_distribution<int> weightDist(50, 300);
     
     std::vector<Item> items = generateKnapsackItems();
@@ -75,21 +81,31 @@ int main()
         std::cout << item.val << " " << item.weight << "\n";
     }
     
-	//Create first generation
-	std::vector<Pop> population = generateFirstGeneration(items.size());
-	
-	//Apply GA for 50 generations
-	for (int gen = 0; gen < 50; gen++)
-	{
-		pickOnlyTheFittests(population, items, W);
-		std::cout << "Gen " << gen << "'s fittest is:" << population[0].fitness << std::endl;
+    //Create first generation
+    std::vector<Pop> population = generateFirstGeneration(items.size(), items, W);
+    
+    //Apply GA for 50 generations
+    for (int gen = 0; gen < 1000; gen++)
+    {
+        pickOnlyTheFittests(population, items, W);
+        std::cout << "Gen " << gen << "'s fittest is:" << population[0].fitness << std::endl;
         std::cout << "Gen " << gen << "'s fittest chromosome is:" << population[0].chromosome << std::endl;
-		createNewGeneration(population);
-		for (int i = 0; i < populationNumber; i++) std::cout << population[i].fitness << std::endl;
-	}
-
-	std::cout << "dynamic knapsack solution : " << knapSackDynamic(W, items) << "\n";
-	
+        createNewGeneration(population);
+        for (int i = 0; i < populationNumber; i++) std::cout << population[i].fitness << std::endl;
+    }
+    
+    for (Pop& p : population)
+        p.fitness = calcFitness(p.chromosome, items, W);
+            
+    std::sort(population.begin(),population.end(), compareInterval);
+    
+    std::cout << "fittest is:" << population[0].fitness << std::endl;
+    std::cout << "fittest chromosome is:" << population[0].chromosome << std::endl;
+    std::cout << "dynamic knapsack solution : " << knapSackDynamic(W, items) << "\n";
+    
+    std::cout << "Number of items " << items.size() << "\n";
+    std::cout << "Knapsack Weight " << W << "\n";
+    
     return 0;
 }
 
@@ -133,19 +149,30 @@ int knapSackDynamic(int W, const std::vector<Item> items)
 }
 
 //--------------------------------------------------------------------------
-std::vector<Pop> generateFirstGeneration(int numberOfItems)
+std::vector<Pop> generateFirstGeneration(int numberOfItems, const std::vector<Item>& items, int totalWeight)
 {
     unsigned long maxNum = std::pow(2, numberOfItems);
     std::uniform_int_distribution<long> longDistributaion(0, maxNum);
+    int fitness;
     
-	// the genes pool
-	std::vector<Pop> population;
+    // the genes pool
+    std::vector<Pop> population;
     
-	for (int i = 0; i < populationNumber; i++)
-		//each solution is in the range of 0 to maxNum
-		population.push_back( Pop(DynamicBitSet(64, longDistributaion(generator)), 0));
+    for (int i = 0; i < populationNumber; i++)
+    {
+        DynamicBitSet chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
+        fitness = calcFitness(chromosome, items, totalWeight);
+        while  (calcFitness(chromosome, items, totalWeight) == 0)
+        {
+            chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
+            fitness = calcFitness(chromosome, items, totalWeight);
+        }
+            
+        //each solution is in the range of 0 to maxNum
+        population.push_back( Pop(chromosome, fitness));                
+    }
     
-	return population;
+    return population;
 }
 //--------------------------------------------------------------------------
 //input:      population
@@ -158,12 +185,14 @@ void pickOnlyTheFittests(std::vector<Pop>& population, const std::vector<Item>& 
         p.fitness = calcFitness(p.chromosome, items, totalWeight);
     }
     
-	//sort:
-	for (int i = 0; i < population.size(); i++) std::cout << population[i].fitness << std::endl;
-		std::sort(population.begin(),population.end(), compareInterval);
+    //sort:
+    for (int i = 0; i < population.size(); i++) 
+        std::cout << population[i].fitness << std::endl;
+        
+    std::sort(population.begin(),population.end(), compareInterval);
 
-	// eraes half which are the least fittest
-	population.erase(population.begin() + (population.size() / 2) , population.end());
+    // eraes half which are the least fittest
+    population.erase(population.begin() + (population.size() / 2) , population.end());
 }
 //--------------------------------------------------------------------------
 //compare from higest to lowest scores
@@ -186,35 +215,37 @@ void createNewGeneration(std::vector< Pop >& population)
 
 	//fill the "killed" individuals with offsprings of fittest parents
 	// create 2 children from each pair
-	population.push_back(mateParents(population[0].chromosome, population[1].chromosome));
-	population.push_back(mateParents(population[0].chromosome, population[1].chromosome));
-	population.push_back(mateParents(population[2].chromosome, population[3].chromosome));
-	population.push_back(mateParents(population[2].chromosome, population[3].chromosome));
+        int popSize = population.size();
+        for (int i = 0; i < popSize; i += 2)
+        {
+            population.push_back(mateParents(population[i].chromosome, population[i+1].chromosome));
+            population.push_back(mateParents(population[i].chromosome, population[i+1].chromosome));
+        }
 }
 //-------------------------------------------------------------------------
 Pop mateParents(DynamicBitSet parent1, DynamicBitSet parent2)
 {
-	int joinBitLocation = (rand() % numberOfBits);
-	joinBitLocation = numberOfBits - joinBitLocation;
-	
-	// mask starts as numberOfBits ones
-    unsigned long temp = pow(2, numberOfBits + 1) - 1;
-	DynamicBitSet mask = DynamicBitSet(64, temp);
-	// leave ones in the mask only from joinBitLocation to LSB
-    mask = mask >> joinBitLocation;
-		
-	DynamicBitSet chromozomeX = parent1 & (mask.flip()); // upper  part
-	DynamicBitSet chromozomeY = parent2 & mask;    // bottom part
-	DynamicBitSet child = chromozomeX | chromozomeY;
-
-	if (rand() % 6 == 0)
-	{
-		// what bit to flip? when 0 is the LSB and 11 the MSB
-		int randMutation = rand() % numberOfBits;
-        child.flip(randMutation);
-	}
+    int joinBitLocation = (rand() % parent1.size());
+    joinBitLocation = parent1.size() - joinBitLocation;
     
-	return Pop(child, 0);
+    // mask starts as numberOfBits ones
+    unsigned long temp = pow(2, parent1.size() + 1) - 1;
+    DynamicBitSet mask = DynamicBitSet(parent1.size(), temp);
+    // leave ones in the mask only from joinBitLocation to LSB
+    mask = mask >> joinBitLocation;
+        
+    DynamicBitSet chromozomeX = parent1 & (mask.flip()); // upper  part
+    DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
+    DynamicBitSet child = chromozomeX | chromozomeY;
+
+    if (rand() % 6 == 0)
+    {
+        // what bit to flip? when 0 is the LSB and 11 the MSB
+        int randMutation = rand() % parent1.size();
+        child.flip(randMutation);
+    }
+    
+    return Pop(child, 0);
 }
 
 int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight)
@@ -222,6 +253,11 @@ int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight
     int fitness = 0;
     int weight = 0;
     int i = a.find_first();
+    
+    if (i == DynamicBitSet::npos)
+    {
+        return -20000;
+    }
     
     fitness += items[i].val;
     weight += items[i].weight;
@@ -233,7 +269,9 @@ int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight
     }
     // penalized over the weight limit solutions
     if (weight > totalWeight)
-        fitness -= (50 + (totalWeight - weight));
+        //fitness -= (100 + (totalWeight - weight));
+        fitness = -10000 + (totalWeight - weight);
+        //fitness = 0;
     
     return fitness;
 }
