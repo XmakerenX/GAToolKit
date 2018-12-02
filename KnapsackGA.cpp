@@ -44,7 +44,7 @@ std::vector<Pop>            generateFirstGeneration (int numberOfItems, const st
 void                        pickOnlyTheFittests     (std::vector<Pop>& population, const std::vector<Item>& items, int totalWeight);
 void                        createNewGeneration     (std::vector<Pop>& population);
 
-void                        mateParents             (DynamicBitSet parent1, DynamicBitSet parent2, std::vector< Pop >& population);
+void                        mateParents             (int parent1Index, int parent2Index, std::vector< Pop >& population);
 void                        mutateChild             (DynamicBitSet& child);
 int                         calcFitness             (DynamicBitSet a, const std::vector<Item>& items, int totalWeight);
 bool                        cmp                     (DynamicBitSet a, DynamicBitSet b);
@@ -56,6 +56,7 @@ bool                        compareInterval         (const Pop& a, const Pop& b)
 //A genetic algorithem will behave, and that is why I am writing this code
 
 const int populationNumber = 1000;
+const int eliteSize = 100;
 // const int numberOfBits = 12;
 // const int searchSpace = pow(2,numberOfBits);
 
@@ -86,7 +87,7 @@ int main()
     int lastFittest = -300000;
     int con = 0;
     //Apply GA for 50 generations
-    for (int gen = 0; gen < 50; gen++)
+    for (int gen = 0; gen < 1000; gen++)
     {
         pickOnlyTheFittests(population, items, W);
         std::cout << "Gen " << gen << "'s fittest is:" << population[0].fitness << std::endl;
@@ -226,7 +227,11 @@ void pickOnlyTheFittests(std::vector<Pop>& population, const std::vector<Item>& 
     std::sort(population.begin(),population.end(), compareInterval);
 
     // eraes half which are the least fittest
-    population.erase(population.begin() + (population.size() / 2) , population.end());
+    //population.erase(population.begin() + (population.size() / 2) , population.end());
+    population.erase(population.end() - eliteSize , population.end());
+    
+    for (int i = 0; i < eliteSize; i++)
+        population.push_back(population[i]);
 }
 //--------------------------------------------------------------------------
 //compare from higest to lowest scores
@@ -245,23 +250,25 @@ bool compareInterval(const Pop& a, const Pop& b)
 //-------------------------------------------------------------------------
 void createNewGeneration(std::vector< Pop >& population)
 {
-	std::random_shuffle(population.begin(), population.end());
+	std::random_shuffle(population.begin() + 2, population.end());
 
 	//fill the "killed" individuals with offsprings of fittest parents
 	// create 2 children from each pair
         int popSize = population.size();
-        for (int i = 0; i < popSize; i += 2)
+        for (int i = eliteSize; i < popSize; i += 2)
         {
-            mateParents(population[i].chromosome, population[i+1].chromosome, population);
+            mateParents(i, i + 1, population);
         }
 }
 //-------------------------------------------------------------------------
-void mateParents(DynamicBitSet parent1, DynamicBitSet parent2, std::vector< Pop >& population)
+void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& population)
 {
+    DynamicBitSet& parent1 = population[parent1Index].chromosome;
+    DynamicBitSet& parent2 = population[parent2Index].chromosome;
+    
     int joinBitLocation = (rand() % parent1.size());
     joinBitLocation = parent1.size() - joinBitLocation;
-    
-    joinBitLocation = parent1.size() / 2;
+    //joinBitLocation = parent1.size() / 2;
     
     // mask starts as numberOfBits ones
     unsigned long temp = pow(2, parent1.size() + 1) - 1;
@@ -273,13 +280,15 @@ void mateParents(DynamicBitSet parent1, DynamicBitSet parent2, std::vector< Pop 
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
     DynamicBitSet child = chromozomeX | chromozomeY;
     mutateChild(child);
-    population.push_back(Pop(child, 0));
+    parent1 = child;
+    //population.push_back(Pop(child, 0));
     
     chromozomeX = parent2 & (mask.flip()); // upper  part
     chromozomeY = parent1 & mask;          // bottom part
     child = chromozomeX | chromozomeY;
     mutateChild(child);
-    population.push_back(Pop(child, 0));
+    parent2 = child;
+    //population.push_back(Pop(child, 0));
 }
 
 void mutateChild(DynamicBitSet& child)
