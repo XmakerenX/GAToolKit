@@ -146,7 +146,7 @@ int main()
 
 std::vector<Item> generateKnapsackItems(int numberOfItems)
 {
-    std::uniform_int_distribution<int> itemNumDist(10, 64);
+    std::uniform_int_distribution<int> itemNumDist(30, 64);
     std::uniform_int_distribution<int> itemDist(1, 100);
     
     std::vector<Item> items;
@@ -280,14 +280,15 @@ void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& populat
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
     DynamicBitSet child = chromozomeX | chromozomeY;
     mutateChild(child);
-    parent1 = child;
     //population.push_back(Pop(child, 0));
     
     chromozomeX = parent2 & (mask.flip()); // upper  part
     chromozomeY = parent1 & mask;          // bottom part
-    child = chromozomeX | chromozomeY;
-    mutateChild(child);
-    parent2 = child;
+    DynamicBitSet child2 = chromozomeX | chromozomeY;
+    mutateChild(child2);
+    
+    parent1 = child;
+    parent2 = child2;
     //population.push_back(Pop(child, 0));
 }
 
