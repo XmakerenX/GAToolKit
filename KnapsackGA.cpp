@@ -197,7 +197,15 @@ std::vector<Item> generateKnapsackItems(int numberOfItems)
 int knapSackDynamic(int W, const std::vector<Item> items)
 {
     int i, w;
-    int K[items.size() + 1][W + 1];
+#ifdef _WIN32
+	int ** K;
+	K = new int*[items.size() + 1];
+	for (int i = 0; i < items.size() + 1; i++)
+		K[i] = new int[W + 1];
+#else
+	int K[items.size() + 1][W + 1];
+#endif
+
     // Build table K[][] in bottom up manner
     for (i = 0; i <= items.size(); i++)
     {
@@ -213,7 +221,14 @@ int knapSackDynamic(int W, const std::vector<Item> items)
         }
     }
 
-    return K[items.size()][W];
+	int ret = K[items.size()][W];
+#ifdef _WIN32
+	// free K 
+	for (int i = 0; i < items.size() + 1; i++)
+		delete[] K[i];
+	delete[] K;
+#endif
+    return ret;
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -313,7 +328,7 @@ void createNewGeneration(std::vector< Pop >& population)
     // mate random pairs from the population
     std::random_shuffle(population.begin() + 2, population.end());
 
-    for (int i = 0; i < population.size(); i += 2)
+    for (int i = 0; i < populationNumber; i += 2)
     {
         mateParents(i, i + 1, population);
     }
@@ -340,13 +355,13 @@ void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& populat
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
     DynamicBitSet child = chromozomeX | chromozomeY;
     mutateChild(child);
-    population.push_back(Pop(child, 0));
     
     chromozomeX = parent2 & (mask.flip()); // upper  part
     chromozomeY = parent1 & mask;          // bottom part
     DynamicBitSet child2 = chromozomeX | chromozomeY;
     mutateChild(child2);
     
+	population.push_back(Pop(child, 0));
     population.push_back(Pop(child2, 0));
 }
 
