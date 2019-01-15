@@ -13,3 +13,4 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(GeneticsAlgorithem GeneticsAlgorithem.cpp)
 add_executable(KnapsackGA KnapsackGA.cpp)
+add_executable(2DKnapsackGA 2DKnapsackGA.cpp)
