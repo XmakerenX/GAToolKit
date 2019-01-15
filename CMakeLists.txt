@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.0)
 
 project(GAToolKit)
 
-find_package(boost QUIET REQUIRED)
+if (WIN32)
+    find_package(boost QUIET REQUIRED)
+endif(WIN32)
+if (UNIX)
+    find_package(Boost QUIET REQUIRED)
+endif(UNIX)
+
 include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(GeneticsAlgorithem GeneticsAlgorithem.cpp)
