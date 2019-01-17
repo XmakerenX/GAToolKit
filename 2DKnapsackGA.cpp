@@ -449,7 +449,7 @@ void createNewGeneration(const Knapsack2DCase& knapsackCase, std::vector<Pop>& p
     // apply elitizm so the 10 best solutions can never be not selected
     // TODO: might be good idea to not add best solutions that were anyways selected...
     std::sort(population.begin(),population.end(), compareInterval);
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 1; i++)
         newPopulation.push_back(population[i]);
     
     population = std::move(newPopulation);
@@ -464,7 +464,9 @@ void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& populat
     DynamicBitSet& parent1 = population[parent1Index].chromosome;
     DynamicBitSet& parent2 = population[parent2Index].chromosome;
     
-    int joinBitLocation = (rand() % parent1.size());
+    std::uniform_int_distribution<int> joinBitDist(1, parent1.size() - 1);
+    int joinBitLocation = joinBitDist(generator);
+    //int joinBitLocation = (rand() % parent1.size());
     joinBitLocation = parent1.size() - joinBitLocation;
     
     // mask starts as numberOfBits ones
@@ -472,13 +474,15 @@ void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& populat
     DynamicBitSet mask = DynamicBitSet(parent1.size(), temp);
     // leave ones in the mask only from joinBitLocation to LSB
     mask = mask >> joinBitLocation;
+    DynamicBitSet flippedMask = mask;
+    flippedMask.flip();
         
-    DynamicBitSet chromozomeX = parent1 & (mask.flip()); // upper  part
+    DynamicBitSet chromozomeX = parent1 & flippedMask; // upper  part
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
     DynamicBitSet child = chromozomeX | chromozomeY;
     mutateChild(child);
     
-    chromozomeX = parent2 & (mask.flip()); // upper  part
+    chromozomeX = parent2 & flippedMask; // upper  part
     chromozomeY = parent1 & mask;          // bottom part
     DynamicBitSet child2 = chromozomeX | chromozomeY;
     mutateChild(child2);

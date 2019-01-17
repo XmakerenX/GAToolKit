@@ -14,6 +14,7 @@
      
 #include <cmath>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/random/discrete_distribution.hpp>
 
 typedef boost::dynamic_bitset<> DynamicBitSet;
 
@@ -40,6 +41,11 @@ struct Pop
         fitness = _fitness;
     }
     
+    bool operator== (const Pop& b)
+    {
+        return chromosome == b.chromosome;
+    }
+    
     DynamicBitSet chromosome;
     int fitness;
 };
@@ -54,10 +60,10 @@ void                        generatePopulation      (int popToGenerate, const st
 void                        pickOnlyTheFittests     (std::vector<Pop>& population, const std::vector<Item>& items, int totalWeight);
 void                        createNewGeneration     (std::vector<Pop>& population);
 
-void                        mateParents             (int parent1Index, int parent2Index, std::vector< Pop >& population);
+void                        mateParents             (int parent1Index, int parent2Index, std::vector<Pop>& population, std::vector<Pop>& newPopulation);
 void                        mutateChild             (DynamicBitSet& child);
 int                         calcFitness             (DynamicBitSet a, const std::vector<Item>& items, int totalWeight);
-bool                        cmp                     (DynamicBitSet a, DynamicBitSet b);
+bool                        cmp                     (const Pop& a, const Pop& b);
 bool                        compareInterval         (const Pop& a, const Pop& b);
 
 int                         AddFitness              (const int& left, const Pop& right);
@@ -91,7 +97,7 @@ int main()
     
     //Create first generation
     std::vector<Pop> population = generateFirstGeneration(items.size(), items, W);
-    
+              
     int lastFitnessAvg = -300000;
     int nGenOfNoChange = 0;
     int generation;
@@ -108,29 +114,27 @@ int main()
         for (int i = 0; i < populationNumber; i++) 
         {
             population[i].fitness = calcFitness(population[i].chromosome, items, W);
-            //std::cout << population[i].fitness << std::endl;
         }
         
         int fitnessAvg = std::accumulate(population.begin(), population.end(), 0, AddFitness) / populationNumber;
-        
         std::cout << "fitness averge " << fitnessAvg << "\n";
         
-        if (lastFitnessAvg == fitnessAvg)
-        {
-            nGenOfNoChange++;
-            if (nGenOfNoChange == 10)
-            {
-                // nuke the population but 1 from orbit and try again with new population
-                population.erase(population.begin() + 1, population.end());
-                generatePopulation(999, items, W,population);
-            }
-                
-        }
-        else
-        {
-            nGenOfNoChange = 0;
-            lastFitnessAvg = fitnessAvg;
-        }
+//         if (lastFitnessAvg == fitnessAvg)
+//         {
+//             nGenOfNoChange++;
+//             if (nGenOfNoChange == 10)
+//             {
+//                 // nuke the population but 1 from orbit and try again with new population
+//                 population.erase(population.begin() + 1, population.end());
+//                 generatePopulation(9, items, W,population);
+//             }
+//                 
+//         }
+//         else
+//         {
+//             nGenOfNoChange = 0;
+//             lastFitnessAvg = fitnessAvg;
+//         }
         
         
     }
@@ -247,11 +251,6 @@ std::vector<Pop> generateFirstGeneration(int numberOfItems, const std::vector<It
     {
         DynamicBitSet chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
         fitness = calcFitness(chromosome, items, totalWeight);
-        while  (calcFitness(chromosome, items, totalWeight) == 0)
-        {
-            chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
-            fitness = calcFitness(chromosome, items, totalWeight);
-        }
             
         //each solution is in the range of 0 to maxNum
         population.push_back( Pop(chromosome, fitness));                
@@ -273,11 +272,6 @@ void generatePopulation(int popToGenerate, const std::vector<Item>& items, int t
     {
         DynamicBitSet chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
         fitness = calcFitness(chromosome, items, totalWeight);
-        while  (calcFitness(chromosome, items, totalWeight) == 0)
-        {
-            chromosome = DynamicBitSet(items.size(), longDistributaion(generator));
-            fitness = calcFitness(chromosome, items, totalWeight);
-        }
             
         //each solution is in the range of 0 to maxNum
         population.push_back( Pop(chromosome, fitness));                
@@ -298,17 +292,15 @@ void pickOnlyTheFittests(std::vector<Pop>& population, const std::vector<Item>& 
     }
             
     std::sort(population.begin(),population.end(), compareInterval);
-    population.erase(population.begin() + 1000, population.end());
+    population.erase(population.begin() + populationNumber, population.end());
 }
 //-----------------------------------------------------------------------------------------------
 // cmp
 // compare from higest to lowest scores
 //-----------------------------------------------------------------------------------------------
-bool cmp(DynamicBitSet a, DynamicBitSet b)
+bool cmp(const Pop& a, const Pop& b)
 {
-    DynamicBitSet a_score = a&a;
-    DynamicBitSet b_score = b&b;
-    return (a_score >= b_score);
+    return (a.fitness < b.fitness);
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -325,44 +317,88 @@ bool compareInterval(const Pop& a, const Pop& b)
 //-----------------------------------------------------------------------------------------------
 void createNewGeneration(std::vector< Pop >& population)
 {
-    // mate random pairs from the population
-    std::random_shuffle(population.begin() + 2, population.end());
-
+    std::vector<Pop> newPopulation;
+    
+    int min = 10000;
+    for (int i = 0; i < population.size(); i++)
+    {
+        if (population[i].fitness < min)
+            min = population[i].fitness;
+    }
+    
+    if (min < 0)
+    {
+        for (int i = 0; i < population.size(); i++)
+            population[i].fitness += (min + 1);
+    }
+    
+    int fitnessSum = std::accumulate(population.begin(), population.end(), 0 ,AddFitness);
+    
+    std::vector<double> probabilities;
+    for (int i = 0; i < population.size(); i++)
+    {
+        probabilities.push_back((double)population[i].fitness / fitnessSum);
+    }
+    
+    boost::random::discrete_distribution<> dist(probabilities);
     for (int i = 0; i < populationNumber; i += 2)
     {
-        mateParents(i, i + 1, population);
+        int parent1Index, parent2Index;
+        parent1Index = dist(generator);
+        parent2Index = dist(generator);
+        newPopulation.push_back(population[parent1Index]);
+        newPopulation.push_back(population[parent2Index]);
+        mateParents(parent1Index, parent2Index, population, newPopulation);
     }
+
+    if (min < 0)
+    {
+        for (int i = 0; i < population.size(); i++)
+            population[i].fitness -= (min + 1);
+    }
+    
+     std::sort(population.begin(),population.end(), compareInterval);
+     for (int i = 0; i < 1; i++)
+         newPopulation.push_back(population[i]);
+        
+    population = std::move(newPopulation);
 }
 
 //-----------------------------------------------------------------------------------------------
 // mateParents
 //-----------------------------------------------------------------------------------------------
-void mateParents(int parent1Index, int parent2Index, std::vector< Pop >& population)
+void mateParents(int parent1Index, int parent2Index, std::vector<Pop>& population, std::vector<Pop>& newPopulation)
 {
     DynamicBitSet& parent1 = population[parent1Index].chromosome;
     DynamicBitSet& parent2 = population[parent2Index].chromosome;
     
-    int joinBitLocation = (rand() % parent1.size());
+    DynamicBitSet child, child2;
+
+    std::uniform_int_distribution<int> joinBitDist(1, parent1.size() - 1);
+    //int joinBitLocation = (rand() % parent1.size());
+    int joinBitLocation = joinBitDist(generator);
     joinBitLocation = parent1.size() - joinBitLocation;
-    
+        
     // mask starts as numberOfBits ones
     unsigned long temp = pow(2, parent1.size() + 1) - 1;
     DynamicBitSet mask = DynamicBitSet(parent1.size(), temp);
     // leave ones in the mask only from joinBitLocation to LSB
     mask = mask >> joinBitLocation;
-        
-    DynamicBitSet chromozomeX = parent1 & (mask.flip()); // upper  part
+    DynamicBitSet flippedMask = mask;
+    flippedMask.flip();
+            
+    DynamicBitSet chromozomeX = parent1 & flippedMask; // upper  part
     DynamicBitSet chromozomeY = parent2 & mask;          // bottom part
-    DynamicBitSet child = chromozomeX | chromozomeY;
+    child = chromozomeX | chromozomeY;
     mutateChild(child);
-    
-    chromozomeX = parent2 & (mask.flip()); // upper  part
+        
+    chromozomeX = parent2 & flippedMask; // upper  part
     chromozomeY = parent1 & mask;          // bottom part
-    DynamicBitSet child2 = chromozomeX | chromozomeY;
+    child2 = chromozomeX | chromozomeY;
     mutateChild(child2);
-    
-	population.push_back(Pop(child, 0));
-    population.push_back(Pop(child2, 0));
+                
+     newPopulation.push_back(Pop(child, 0));
+     newPopulation.push_back(Pop(child2, 0));
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -392,7 +428,7 @@ int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight
     
     if (i == DynamicBitSet::npos)
     {
-        return -20000;
+        return 0;
     }
     
     fitness += items[i].val;
@@ -405,9 +441,9 @@ int calcFitness(DynamicBitSet a, const std::vector<Item>& items, int totalWeight
     }
     // penalized over the weight limit solutions
     if (weight > totalWeight)
-        //fitness -= (100 + (totalWeight - weight));
-        fitness = -10000 + (totalWeight - weight);
-        //fitness = 0;
+    {
+        fitness = totalWeight - weight;
+    }
     
     return fitness;
 }
