@@ -329,7 +329,7 @@ void createNewGeneration(std::vector< Pop >& population)
     if (min < 0)
     {
         for (int i = 0; i < population.size(); i++)
-            population[i].fitness += (min + 1);
+            population[i].fitness -= (min + 1);
     }
     
     int fitnessSum = std::accumulate(population.begin(), population.end(), 0 ,AddFitness);
@@ -354,7 +354,7 @@ void createNewGeneration(std::vector< Pop >& population)
     if (min < 0)
     {
         for (int i = 0; i < population.size(); i++)
-            population[i].fitness -= (min + 1);
+            population[i].fitness += (min + 1);
     }
     
      std::sort(population.begin(),population.end(), compareInterval);
